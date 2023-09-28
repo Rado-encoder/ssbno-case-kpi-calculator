@@ -1,10 +1,17 @@
 "use client";
-import React, { useState, FormEvent } from "react";
+import React, { useState, FormEvent, useEffect } from "react";
 import "./page.css"; // Import your custom CSS file
 import "bootstrap/dist/css/bootstrap.min.css"; // Import Bootstrap CSS
-import { fetchKpiYearData, fetchKpiMonthData } from "./api/api";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-
+import { getKpiData } from "./api/api";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
 
 interface Option {
   label: string;
@@ -36,7 +43,23 @@ export default function Home() {
   const [newAmount, setNewAmount] = useState<number | null>(null); // State variable to store new amount
   const [chartData, setChartData] = useState<any[]>([]); // State variable to store line chart data
   const [formSubmitted, setFormSubmitted] = useState<boolean>(false); // State variable to track form submission
+  const [kpiData, setKpiData] = useState<any>(false); // State variable to track form submission
+  const [yearsRange, setYearsRange] = useState<{
+    min: string;
+    max: string;
+  }>({ min: "1865", max: "2023" }); // State variable to store allowed years range
 
+  useEffect(() => {
+    getKpiData().then((res) => {
+      const [yearData] = res;
+      const years = yearData.map((item) => parseInt(item.year));
+      setYearsRange({
+        min: Math.min(...years).toString(),
+        max: Math.max(...years).toString(),
+      });
+      setKpiData(res); // Store API respoonse
+    });
+  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -49,24 +72,21 @@ export default function Home() {
       toYear,
       toMonth,
     };
-    
+
     try {
       // Call the API to fetch the required data
-      const [yearData, monthData] = await Promise.all([
-        fetchKpiYearData(), // Fetch year data from API
-        fetchKpiMonthData(), // Fetch month data from API
-      ]);
+      const [yearData, monthData] = kpiData;
 
       let fromDateKPI = null;
       let toDateKPI = null;
-    
+
       // Check if fromYear is in monthData
       const monthDataYears = Object.keys(monthData);
       const isFromYearInMonthData = monthDataYears.includes(fromYear);
-    
+
       // Check if toYear is in monthData
       const isToYearInMonthData = monthDataYears.includes(toYear);
-    
+
       // Extract monthKPI value from monthData for the corresponding fromYear and fromMonth
       if (isFromYearInMonthData && fromMonth) {
         const fromYearData = monthData[fromYear as keyof typeof monthData];
@@ -109,12 +129,14 @@ export default function Home() {
 
       // If fromYear is not in monthData, collect yearKPI from yearData
       if (!isFromYearInMonthData) {
-        const fromYearData = yearData.find((data: any) => data.year === fromYear);
+        const fromYearData = yearData.find(
+          (data: any) => data.year === fromYear
+        );
         if (fromYearData) {
           fromDateKPI = fromYearData.yearKPI;
         }
       }
-    
+
       // If toYear is not in monthData, collect yearKPI from yearData
       if (!isToYearInMonthData) {
         const toYearData = yearData.find((data: any) => data.year === toYear);
@@ -124,18 +146,25 @@ export default function Home() {
       }
 
       // Utregning av prosentvis endring
-      const pointChange = Math.round((toDateKPI ?? 0) - (fromDateKPI ?? 0)); 
-      const percentageChange = Math.round(((pointChange * 100) / (fromDateKPI ?? 1)));
+      const pointChange = Math.round((toDateKPI ?? 0) - (fromDateKPI ?? 0));
+      const percentageChange = Math.round(
+        (pointChange * 100) / (fromDateKPI ?? 1)
+      );
 
       // Utregning av nytt kronebeløp ved bruk av prosentvis endring i konsumprisindeksen
-      const newAmount = Math.round((Number(amount) * (toDateKPI ?? 1) / (fromDateKPI ?? 1)));
-      
+      const newAmount = Math.round(
+        (Number(amount) * (toDateKPI ?? 1)) / (fromDateKPI ?? 1)
+      );
 
       const chartData = yearData.reduce((data: any[], year: any) => {
         const yearValue = year.year;
         if (
-          (parseInt(fromYear) <= parseInt(toYear) && parseInt(yearValue) >= parseInt(fromYear) && parseInt(yearValue) <= parseInt(toYear)) ||
-          (parseInt(fromYear) > parseInt(toYear) && parseInt(yearValue) >= parseInt(toYear) && parseInt(yearValue) <= parseInt(fromYear))
+          (parseInt(fromYear) <= parseInt(toYear) &&
+            parseInt(yearValue) >= parseInt(fromYear) &&
+            parseInt(yearValue) <= parseInt(toYear)) ||
+          (parseInt(fromYear) > parseInt(toYear) &&
+            parseInt(yearValue) >= parseInt(toYear) &&
+            parseInt(yearValue) <= parseInt(fromYear))
         ) {
           const yearKPI = year.yearKPI;
           data.push({
@@ -147,14 +176,12 @@ export default function Home() {
       }, []);
 
       setChartData(chartData);
-      setPercentageChange(percentageChange); 
+      setPercentageChange(percentageChange);
       setNewAmount(newAmount);
-      setFormSubmitted(true);   
-         
+      setFormSubmitted(true);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
-    
   };
 
   return (
@@ -192,8 +219,8 @@ export default function Home() {
                       name="fromYear"
                       className="form-control"
                       required
-                      min="1865"
-                      max="2023"
+                      min={yearsRange.min}
+                      max={yearsRange.max}
                       value={fromYear}
                       onChange={(e) => setFromYear(e.target.value)}
                     />
@@ -225,14 +252,14 @@ export default function Home() {
                   <div className="form-group">
                     <label htmlFor="toYear">Til år</label>
                     <input
-                     type="number"
-                     id="toYear"
-                     name="toYear"
-                     className="form-control"
-                     required
-                     min="1865"
-                     max="2023"
-                     value={toYear}
+                      type="number"
+                      id="toYear"
+                      name="toYear"
+                      className="form-control"
+                      required
+                      min="1865"
+                      max="2023"
+                      value={toYear}
                       onChange={(e) => setToYear(e.target.value)}
                     />
                   </div>
@@ -274,26 +301,33 @@ export default function Home() {
 
       {/* Conditionally render ResultPage based on form submission */}
       {formSubmitted && (
-            <div className="container mt-4">
-            <div className="card">
-              <div className="card-body">
-                <h1 className="card-title">Beløpet tilsvarer {newAmount ?? 0}kr</h1>
-                <p className="card-text">Prisstigningen er på {percentageChange ?? 0}%</p>
-                <p className="card-text"></p>
+        <div className="container mt-4">
+          <div className="card">
+            <div className="card-body">
+              <h1 className="card-title">
+                Beløpet tilsvarer {newAmount ?? 0}kr
+              </h1>
+              <p className="card-text">
+                Prisstigningen er på {percentageChange ?? 0}%
+              </p>
+              <p className="card-text"></p>
 
-                <LineChart width={600} height={300} data={chartData}>
-                  <XAxis dataKey="label" />
-                  <YAxis domain={['dataMin', 'dataMax']} />
-                  <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="yearKPI" stroke="#4a90e2" dot={false} />
-                </LineChart>
-
-              </div>
+              <LineChart width={600} height={300} data={chartData}>
+                <XAxis dataKey="label" />
+                <YAxis domain={["dataMin", "dataMax"]} />
+                <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="yearKPI"
+                  stroke="#4a90e2"
+                  dot={false}
+                />
+              </LineChart>
             </div>
           </div>
+        </div>
       )}
-
     </main>
   );
 }

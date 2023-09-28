@@ -92,7 +92,6 @@ export async function fetchKpiMonthData() {
     throw new Error('An error occurred while fetching KPI month data.');
   }
 }
-
 export interface YearKpiData {
   dataset: {
     dimension: {
@@ -283,4 +282,10 @@ const cleanMonthData = (data: MonthKpiData): { [year: string]: MonthData[] } => 
   return kpiByYear;
 };
 
+export async function getKpiData() {
+  return await Promise.all([
+    fetchKpiYearData(),
+    fetchKpiMonthData(),
+  ]);
+}
 
