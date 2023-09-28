@@ -257,8 +257,8 @@ export default function Home() {
                       name="toYear"
                       className="form-control"
                       required
-                      min="1865"
-                      max="2023"
+                      min={yearsRange.min}
+                      max={yearsRange.max}
                       value={toYear}
                       onChange={(e) => setToYear(e.target.value)}
                     />
