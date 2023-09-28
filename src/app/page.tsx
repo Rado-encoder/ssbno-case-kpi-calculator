@@ -10,12 +10,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from "recharts";
-
-interface Option {
-  label: string;
-}
+import { KpiDataResponse, Option } from "./types";
+import { calculateChanges, getChartData, extractKPIValue } from "./helpers";
 
 const monthOptions: Option[] = [
   { label: "Årsgjennomsnitt" },
@@ -43,7 +40,7 @@ export default function Home() {
   const [newAmount, setNewAmount] = useState<number | null>(null); // State variable to store new amount
   const [chartData, setChartData] = useState<any[]>([]); // State variable to store line chart data
   const [formSubmitted, setFormSubmitted] = useState<boolean>(false); // State variable to track form submission
-  const [kpiData, setKpiData] = useState<any>(false); // State variable to track form submission
+  const [kpiData, setKpiData] = useState<KpiDataResponse | null>(null); // State variable to track form submission
   const [yearsRange, setYearsRange] = useState<{
     min: string;
     max: string;
@@ -51,7 +48,7 @@ export default function Home() {
 
   useEffect(() => {
     getKpiData().then((res) => {
-      const [yearData] = res;
+      const { yearData } = res;
       const years = yearData.map((item) => parseInt(item.year));
       setYearsRange({
         min: Math.min(...years).toString(),
@@ -64,116 +61,22 @@ export default function Home() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    // Collect the form values
-    const inputData = {
-      amount,
-      fromYear,
-      fromMonth,
-      toYear,
-      toMonth,
-    };
-
     try {
-      // Call the API to fetch the required data
-      const [yearData, monthData] = kpiData;
-
-      let fromDateKPI = null;
-      let toDateKPI = null;
-
-      // Check if fromYear is in monthData
-      const monthDataYears = Object.keys(monthData);
-      const isFromYearInMonthData = monthDataYears.includes(fromYear);
-
-      // Check if toYear is in monthData
-      const isToYearInMonthData = monthDataYears.includes(toYear);
-
-      // Extract monthKPI value from monthData for the corresponding fromYear and fromMonth
-      if (isFromYearInMonthData && fromMonth) {
-        const fromYearData = monthData[fromYear as keyof typeof monthData];
-        const fromMonthData = fromYearData.find(
-          (data: any) => data.label.toLowerCase() === fromMonth.toLowerCase()
-        );
-        if (fromMonthData) {
-          fromDateKPI = fromMonthData.monthKPI;
-          if (fromDateKPI === null) {
-            // Find the next non-null monthKPI
-            const nextNonNullMonthData = fromYearData.find(
-              (data: any) => data.monthKPI !== null
-            );
-            if (nextNonNullMonthData) {
-              fromDateKPI = nextNonNullMonthData.monthKPI;
-            }
-          }
-        }
-      }
-
-      // Extract monthKPI value from monthData for the corresponding toYear and toMonth
-      if (isToYearInMonthData && toMonth) {
-        const toYearData = monthData[toYear as keyof typeof monthData];
-        const toMonthData = toYearData.find(
-          (data: any) => data.label.toLowerCase() === toMonth.toLowerCase()
-        );
-        if (toMonthData) {
-          toDateKPI = toMonthData.monthKPI;
-          if (toDateKPI === null) {
-            // Find the next non-null monthKPI
-            const nextNonNullMonthData = toYearData.find(
-              (data: any) => data.monthKPI !== null
-            );
-            if (nextNonNullMonthData) {
-              toDateKPI = nextNonNullMonthData.monthKPI;
-            }
-          }
-        }
-      }
-
-      // If fromYear is not in monthData, collect yearKPI from yearData
-      if (!isFromYearInMonthData) {
-        const fromYearData = yearData.find(
-          (data: any) => data.year === fromYear
-        );
-        if (fromYearData) {
-          fromDateKPI = fromYearData.yearKPI;
-        }
-      }
-
-      // If toYear is not in monthData, collect yearKPI from yearData
-      if (!isToYearInMonthData) {
-        const toYearData = yearData.find((data: any) => data.year === toYear);
-        if (toYearData) {
-          toDateKPI = toYearData.yearKPI;
-        }
-      }
-
-      // Utregning av prosentvis endring
-      const pointChange = Math.round((toDateKPI ?? 0) - (fromDateKPI ?? 0));
-      const percentageChange = Math.round(
-        (pointChange * 100) / (fromDateKPI ?? 1)
+      const { yearData, monthData } = kpiData as KpiDataResponse;
+      const fromDateKPI = extractKPIValue(
+        fromYear,
+        fromMonth,
+        yearData,
+        monthData
+      );
+      const toDateKPI = extractKPIValue(toYear, toMonth, yearData, monthData);
+      const { percentageChange, newAmount } = calculateChanges(
+        Number(amount),
+        fromDateKPI ?? 0,
+        toDateKPI ?? 0
       );
 
-      // Utregning av nytt kronebeløp ved bruk av prosentvis endring i konsumprisindeksen
-      const newAmount = Math.round(
-        (Number(amount) * (toDateKPI ?? 1)) / (fromDateKPI ?? 1)
-      );
-
-      const chartData = yearData.reduce((data: any[], year: any) => {
-        const yearValue = year.year;
-        if (
-          (parseInt(fromYear) <= parseInt(toYear) &&
-            parseInt(yearValue) >= parseInt(fromYear) &&
-            parseInt(yearValue) <= parseInt(toYear)) ||
-          (parseInt(fromYear) > parseInt(toYear) &&
-            parseInt(yearValue) >= parseInt(toYear) &&
-            parseInt(yearValue) <= parseInt(fromYear))
-        ) {
-          const yearKPI = year.yearKPI;
-          data.push({
-            label: yearValue,
-            yearKPI: yearKPI,
-          });
-        }
-        return data;
-      }, []);
+      const chartData = getChartData(yearData, fromYear, toYear);
 
       setChartData(chartData);
       setPercentageChange(percentageChange);
@@ -201,8 +104,8 @@ export default function Home() {
                       name="amount"
                       className="form-control"
                       required
-                      pattern="[0-9]+([,.][0-9]+)?"
-                      title="Du kan kun skrive inn et tall, for eksempel 150,50"
+                      pattern="[0-9]+([.][0-9]+)?"
+                      title="Du kan kun skrive inn et tall, for eksempel 150.50"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                     />

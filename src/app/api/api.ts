@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { YearKpiData, MonthKpiData, MonthData, KpiDataResponse } from '../types';
 
 const kpiYearDatasetURL = 'https://data.ssb.no/api/v0/no/table/08184';
 const kpiYearQuery = {
@@ -92,145 +93,9 @@ export async function fetchKpiMonthData() {
     throw new Error('An error occurred while fetching KPI month data.');
   }
 }
-export interface YearKpiData {
-  dataset: {
-    dimension: {
-      ContentsCode: {
-        label: string;
-        category: {
-          index: {
-            KpiAar: number;
-          };
-          label: {
-            KpiAar: string;
-          };
-          unit: {
-            KpiAar: {
-              base: string;
-              decimals: number;
-            };
-          };
-        };
-        link: {
-          describedby: {
-            extension: {
-              KpiAar: string;
-            };
-          }[];
-        };
-        extension: {
-          show: string;
-        };
-      };
-      Tid: {
-        label: string;
-        category: {
-          index: {
-            [key: string]: number;
-          };
-          label: {
-            [key: string]: string;
-          };
-        };
-        extension: {
-          show: string;
-        };
-      };
-    };
-    label: string;
-    source: string;
-    updated: string;
-    value: number[];
-    extension: {
-      px: {
-        infofile: string;
-        tableid: string;
-        decimals: number;
-      };
-    };
-  };
-}
 
-export interface MonthKpiData {
-  dataset: {
-    status: {
-      [key: string]: string;
-    };
-    dimension: {
-      Maaned: {
-        label: string;
-        category: {
-          index: {
-            [key: string]: number;
-          };
-          label: {
-            [key: string]: string;
-          };
-        };
-        extension: {
-          show: string;
-        };
-      };
-      ContentsCode: {
-        label: string;
-        category: {
-          index: {
-            [key: string]: number;
-          };
-          label: {
-            [key: string]: string;
-          };
-          unit: {
-            [key: string]: {
-              base: string;
-              decimals: number;
-            };
-          };
-        };
-        link: {
-          describedby: {
-            extension: {
-              [key: string]: string;
-            };
-          }[];
-        };
-        extension: {
-          show: string;
-        };
-      };
-      Tid: {
-        label: string;
-        category: {
-          index: {
-            [key: string]: number;
-          };
-          label: {
-            [key: string]: string;
-          };
-        };
-        extension: {
-          show: string;
-        };
-      };
-    };
-    id: string[];
-    size: number[];
-    role: {
-      metric: string[];
-      time: string[];
-    };
-    value: (number | null)[];
-  };
-  label: string;
-  source: string;
-  updated: string;
-}
 
-interface MonthData {
-  month: string;
-  label: string;
-  monthKPI: number | null;
-}
+
 
 
 const cleanYearData = (data: YearKpiData): { year: string; yearKPI: number }[] => {
@@ -282,10 +147,12 @@ const cleanMonthData = (data: MonthKpiData): { [year: string]: MonthData[] } => 
   return kpiByYear;
 };
 
-export async function getKpiData() {
-  return await Promise.all([
+export async function getKpiData(): Promise<KpiDataResponse> {
+  const [yearData, monthData] = await Promise.all([
     fetchKpiYearData(),
     fetchKpiMonthData(),
   ]);
+
+  return { yearData, monthData };
 }
 
